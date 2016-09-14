@@ -2,7 +2,8 @@ var fs = require('fs');
 var path = require('path');
 var spawn = require('child_process').spawn;
 var stream = require("stream");
-var util   = require("util");
+var util = require("util");
+var os = require('os');
 
 var haxeRe = /\.hx$/i;
 
@@ -47,7 +48,7 @@ Haxeify.prototype._flush = function (callback) {
     if (code !== 0) {
       self.emit('error', new Error(stderr));
     }
-    fs.readFile(haxeToJs(self._filename), function(err, data) {
+    fs.readFile(self._opts.outFilename, function(err, data) {
       if (err) {
         self.emit('error', err);
       }
@@ -65,8 +66,11 @@ Haxeify.configure = function (filename, opts) {
     return stream.PassThrough();
   }
 
+  var outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'haxeify-'));
+  var outFilename = path.join(outDir, haxeToJs(filename));
+
   cmd = opts.haxe || 'haxe';
-  args = [haxeToClass(filename), '-js', haxeToJs(filename)];
+  args = [haxeToClass(filename), '-js', outFilename];
 
   if (typeof opts.hxml == 'string') {
     args.unshift(opts.hxml);
@@ -90,7 +94,7 @@ Haxeify.configure = function (filename, opts) {
   }
 
 
-  return new Haxeify(filename, {cmd: cmd, args: args});
+  return new Haxeify(filename, {cmd: cmd, args: args, outFilename: outFilename});
 };
 
 util.inherits(Haxeify, stream.Transform);
