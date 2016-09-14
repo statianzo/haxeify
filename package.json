@@ -22,11 +22,8 @@
     "url": "https://github.com/MisumiRize/haxeify/issues"
   },
   "homepage": "https://github.com/MisumiRize/haxeify",
-  "dependencies": {
-    "through2": "^0.6.3"
-  },
   "devDependencies": {
-    "browserify": "^8.1.1",
+    "browserify": "^13.1.0",
     "tap": "^0.5.0"
   }
 }

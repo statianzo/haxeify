@@ -1,74 +1,97 @@
-var spawn = require('child_process').spawn;
-var through = require('through2');
 var fs = require('fs');
 var path = require('path');
+var spawn = require('child_process').spawn;
+var stream = require("stream");
+var util   = require("util");
+
 var haxeRe = /\.hx$/i;
 
-function isHaxe(file) {
-    return haxeRe.test(file);
+function isHaxe(filename) {
+  return haxeRe.test(filename);
 }
 
-function haxeToJs(file) {
-    return file + '.js';
+function haxeToJs(filename) {
+  return filename + '.js';
 }
 
-function haxeToClass(file) {
-    return path.basename(file.replace(haxeRe, ''));
+function haxeToClass(filename) {
+  return path.basename(filename.replace(haxeRe, ''));
 }
 
-function haxeify(file, options) {
-    var cmd, args;
+function Haxeify(filename, opts) {
+  if (!(this instanceof Haxeify)) {
+    return Haxeify.configure(filename, opts);
+  }
 
-    if (!isHaxe(file)) {
-        return through();
+  stream.Transform.call(this);
+  this._data = "";
+  this._filename = filename;
+  this._opts = opts;
+}
+
+Haxeify.prototype._transform = function (buf, enc, callback) {
+  this._data += buf;
+  callback();
+};
+
+Haxeify.prototype._flush = function (callback) {
+  var stderr = '';
+  var haxe = spawn(this._opts.cmd, this._opts.args);
+  var self = this;
+
+  haxe.stderr.on('data', function (buf) {
+    stderr += buf;
+  });
+
+  haxe.on('close', function (code) {
+    if (code !== 0) {
+      self.emit('error', new Error(stderr));
     }
+    fs.readFile(haxeToJs(self._filename), function(err, data) {
+      if (err) {
+        self.emit('error', err);
+      }
 
-    options = options || {};
-    cmd = options.haxe || 'haxe';
-    args = [haxeToClass(file), '-js', haxeToJs(file)];
-
-    if (typeof options.hxml == 'string') {
-        args.unshift(options.hxml);
-    }
-
-    if (typeof options.lib == 'string') {
-        args.push('-lib', options.lib);
-    } else if (Array.isArray(options.lib)) {
-        args = options.lib.reduce(function(prev, lib) { return prev.concat(['-lib', lib]); }, args);
-    }
-
-    if (typeof options.dce == 'string') {
-        args.push('-dce', options.dce);
-    }
-
-    if (process.cwd() != path.dirname(file)) {
-        args.push('-cp', path.resolve(process.cwd(), path.dirname(file)));
-    }
-
-    return through(function(_, __, next) {
-        var that = this;
-        var stderr = '';
-        var haxe = spawn(cmd, args);
-
-        haxe.stderr.on('data', function (buf) {
-            stderr += buf;
-        });
-
-        haxe.on('close', function (code) {
-            if (code !== 0) {
-                that.emit('error', stderr);
-            }
-
-            fs.readFile(haxeToJs(file), function(err, data) {
-                if (err) {
-                    that.emit('error', err);
-                }
-
-                that.push(data);
-                next();
-            });
-        });
+      self.push(data);
+      callback();
     });
-}
+  });
+};
 
-module.exports = haxeify;
+Haxeify.configure = function (filename, opts) {
+  opts = opts || {};
+
+  if (!isHaxe(filename)) {
+    return stream.PassThrough();
+  }
+
+  cmd = opts.haxe || 'haxe';
+  args = [haxeToClass(filename), '-js', haxeToJs(filename)];
+
+  if (typeof opts.hxml == 'string') {
+    args.unshift(opts.hxml);
+  }
+
+  if (typeof opts.lib == 'string') {
+    args.push('-lib', opts.lib);
+  }
+  else if (Array.isArray(opts.lib)) {
+    args = opts.lib.reduce(function(prev, lib) {
+      return prev.concat(['-lib', lib]);
+    }, args);
+  }
+
+  if (typeof opts.dce == 'string') {
+    args.push('-dce', opts.dce);
+  }
+
+  if (process.cwd() != path.dirname(filename)) {
+    args.push('-cp', path.resolve(process.cwd(), path.dirname(filename)));
+  }
+
+
+  return new Haxeify(filename, {cmd: cmd, args: args});
+};
+
+util.inherits(Haxeify, stream.Transform);
+module.exports = Haxeify;
