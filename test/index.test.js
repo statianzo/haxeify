@@ -1,15 +1,21 @@
 var browserify = require('browserify');
+var vm = require('vm');
 var test = require('tap').test;
+var path = require('path');
 var haxeify = ('./');
 
 test('bundled with .hx file', function(t) {
-    t.plan(2);
+  t.plan(2);
 
-    browserify()
-        .add(__dirname + '/fixture/TestBundle.hx')
-        .transform(haxeify)
-        .bundle(function(err, src) {
-            t.ok(err == null, 'error should be null');
-            t.ok(/TestBundle\.foo = function()/.test(String(src)), 'src has exported function');
-        });
+  var b = browserify();
+
+  b.require(path.join(__dirname,'/fixture/TestBundle.hx'), {expose: 'bundle'});
+  b.transform([haxeify]);
+
+  b.bundle(function(err, src) {
+    t.error(err);
+    var c = {};
+    vm.runInNewContext(src, c);
+    t.equal(c.require('bundle').foo(), 'bar');
+  });
 });

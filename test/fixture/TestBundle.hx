@@ -2,8 +2,8 @@ package ;
 
 class TestBundle {
 
-	@:export
-	public static function foo() {
-		trace('bar');
-	}
+  @:expose('foo')
+  public static function foo() {
+    return 'bar';
+  }
 }
