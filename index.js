@@ -72,6 +72,10 @@ Haxeify.configure = function (filename, opts) {
   cmd = opts.haxe || 'haxe';
   args = [haxeToClass(filename), '-js', outFilename];
 
+  if (opts.main) {
+    args.unshift('-main');
+  }
+
   if (typeof opts.hxml == 'string') {
     args.unshift(opts.hxml);
   }
@@ -92,7 +96,6 @@ Haxeify.configure = function (filename, opts) {
   if (process.cwd() != path.dirname(filename)) {
     args.push('-cp', path.resolve(process.cwd(), path.dirname(filename)));
   }
-
 
   return new Haxeify(filename, {cmd: cmd, args: args, outFilename: outFilename});
 };
